@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMDB Dashboard</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script> <!-- Axios CDN -->
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .sidebar {
+      background-color: #343a40;
+      color: #fff;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .sidebar a {
+      color: #adb5bd;
+      text-decoration: none;
+    }
+    .sidebar a:hover {
+      color: #fff;
+    }
+    .main-content {
+      padding: 2rem;
+    }
+    .card {
+      margin-bottom: 1.5rem;
+    }
+    .card-title {
+      font-size: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Sidebar -->
+      <div class="col-md-3 col-lg-2 sidebar">
+        <h4 class="text-light">TMDB Dashboard</h4>
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="popularMoviesLink">Popular Movies</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="topRatedLink">Top Rated</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="nowPlayingLink">Now Playing</a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="col-md-9 col-lg-10 main-content">
+        <h1 id="pageTitle">Welcome to TMDB Dashboard</h1>
+        <div id="movie-statistics" class="row">
+          <!-- Statistics will be dynamically added here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_KEY = 'b8f762d838752607a6da92a2dfeb41fa'; // Replace with your TMDB API key
+    const BASE_URL = 'https://api.themoviedb.org/3';
+
+    // Fetch data for Popular Movies, Top Rated, or Now Playing
+    async function fetchStatistics(pageType) {
+      let url = '';
+      let pageTitle = '';
+
+      // Set the appropriate API endpoint and page title based on the selected page
+      if (pageType === 'popular') {
+        url = `${BASE_URL}/movie/popular`;
+        pageTitle = 'Popular Movies';
+      } else if (pageType === 'topRated') {
+        url = `${BASE_URL}/movie/top_rated`;
+        pageTitle = 'Top Rated Movies';
+      } else if (pageType === 'nowPlaying') {
+        url = `${BASE_URL}/movie/now_playing`;
+        pageTitle = 'Now Playing Movies';
+      }
+
+      try {
+        const response = await axios.get(url, {
+          params: { api_key: API_KEY, language: 'en-US', page: 1 }
+        });
+        const movies = response.data.results;
+
+        // Calculate total movies and average rating
+        const totalMovies = movies.length;
+        const averageRating = movies.reduce((sum, movie) => sum + movie.vote_average, 0) / totalMovies;
+
+        // Genre distribution
+        const genreCount = {};
+        movies.forEach(movie => {
+          movie.genre_ids.forEach(genreId => {
+            genreCount[genreId] = (genreCount[genreId] || 0) + 1;
+          });
+        });
+
+        // Fetch genre names
+        const genreResponse = await axios.get(`${BASE_URL}/genre/movie/list`, {
+          params: { api_key: API_KEY, language: 'en-US' }
+        });
+        const genres = genreResponse.data.genres;
+        const genreNames = genres.reduce((acc, genre) => {
+          acc[genre.id] = genre.name;
+          return acc;
+        }, {});
+
+        displayStatistics(totalMovies, averageRating, genreCount, genreNames, pageTitle);
+      } catch (error) {
+        console.error('Error fetching statistics:', error);
+        displayError(error.message);
+      }
+    }
+
+    // Display the statistics
+    function displayStatistics(totalMovies, averageRating, genreCount, genreNames, pageTitle) {
+      const movieStatistics = document.getElementById('movie-statistics');
+      movieStatistics.innerHTML = ''; // Clear any existing content
+      const pageTitleElement = document.getElementById('pageTitle');
+      pageTitleElement.innerText = pageTitle; // Set the page title dynamically
+
+      // Display total movies
+      const totalMoviesCard = `
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Total Movies</h5>
+              <p class="card-text">${totalMovies}</p>
+            </div>
+          </div>
+        </div>
+      `;
+      movieStatistics.innerHTML += totalMoviesCard;
+
+      // Display average rating
+      const averageRatingCard = `
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Average Rating</h5>
+              <p class="card-text">${averageRating.toFixed(1)}</p>
+            </div>
+          </div>
+        </div>
+      `;
+      movieStatistics.innerHTML += averageRatingCard;
+
+      // Display genre distribution
+      const genreDistributionCards = Object.keys(genreCount).map(genreId => {
+        return `
+          <div class="col-md-4">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">${genreNames[genreId]}</h5>
+                <p class="card-text">${genreCount[genreId]} movies</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      movieStatistics.innerHTML += genreDistributionCards;
+    }
+
+    // Display error message
+    function displayError(errorMessage) {
+      const movieStatistics = document.getElementById('movie-statistics');
+      movieStatistics.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-danger" role="alert">
+            Error: ${errorMessage}
+          </div>
+        </div>
+      `;
+    }
+
+    // Handle page links
+    document.getElementById('popularMoviesLink').addEventListener('click', () => fetchStatistics('popular'));
+    document.getElementById('topRatedLink').addEventListener('click', () => fetchStatistics('topRated'));
+    document.getElementById('nowPlayingLink').addEventListener('click', () => fetchStatistics('nowPlaying'));
+
+    // Default page on load
+    fetchStatistics('popular');
+  </script>
+</body>
+</html>
+
+
